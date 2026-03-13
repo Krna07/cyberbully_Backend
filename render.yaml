@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cyberbully-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ML_SERVICE_URL
+        value: https://cyberbully-ml-services-1.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false

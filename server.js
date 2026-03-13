@@ -9,8 +9,8 @@ const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'https://cyberbully-ml-services-1.onrender.com';
+const JWT_SECRET = process.env.JWT_SECRET || 'cyberbullying-detection-secret-key-2024-change-this-in-production';
 
 app.use(cors());
 app.use(express.json());
@@ -143,8 +143,18 @@ app.post('/api/analyze', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Text is required' });
     }
 
-    const response = await axios.post(`${ML_SERVICE_URL}/predict`, { text });
+    console.log('Sending request to ML service:', ML_SERVICE_URL);
+    
+    const response = await axios.post(`${ML_SERVICE_URL}/predict`, 
+      { text },
+      { 
+        timeout: 30000, // 30 second timeout
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+    
     const result = response.data;
+    console.log('ML service response received');
     
     // Save to MongoDB with userId
     try {
@@ -165,7 +175,10 @@ app.post('/api/analyze', authenticateToken, async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Analyze error:', error.message);
+    if (error.response) {
+      console.error('ML service error response:', error.response.data);
+    }
     res.status(500).json({ 
       error: 'Failed to analyze text',
       details: error.response?.data || error.message 
