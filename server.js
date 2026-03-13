@@ -144,17 +144,58 @@ app.post('/api/analyze', authenticateToken, async (req, res) => {
     }
 
     console.log('Sending request to ML service:', ML_SERVICE_URL);
+    console.log('Text to analyze:', text.substring(0, 50) + '...');
     
-    const response = await axios.post(`${ML_SERVICE_URL}/predict`, 
-      { text },
-      { 
-        timeout: 30000, // 30 second timeout
-        headers: { 'Content-Type': 'application/json' }
+    let result;
+    let retries = 3;
+    
+    // Retry logic for ML service (in case it's waking up)
+    while (retries > 0) {
+      try {
+        const response = await axios.post(`${ML_SERVICE_URL}/predict`, 
+          { text },
+          { 
+            timeout: 60000, // 60 second timeout for first request (wake up time)
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+        
+        result = response.data;
+        console.log('ML service response received successfully');
+        break;
+      } catch (mlError) {
+        retries--;
+        console.error(`ML service error (${retries} retries left):`, mlError.message);
+        
+        if (retries === 0) {
+          // If ML service fails, use simple keyword-based detection as fallback
+          console.log('Using fallback detection method');
+          const textLower = text.toLowerCase();
+          const toxicWords = ['stupid', 'idiot', 'hate', 'kill', 'die', 'ugly', 'loser', 'dumb'];
+          const foundWords = toxicWords.filter(word => textLower.includes(word));
+          const isToxic = foundWords.length > 0;
+          
+          result = {
+            prediction: isToxic ? "Cyberbullying Detected" : "Safe Message",
+            confidence: isToxic ? 0.75 : 0.85,
+            categories: {
+              toxic: isToxic ? 1 : 0,
+              severe_toxic: 0,
+              obscene: 0,
+              threat: 0,
+              insult: isToxic ? 1 : 0,
+              identity_hate: 0
+            },
+            toxicKeywords: foundWords,
+            language: 'english',
+            fallback: true
+          };
+        } else {
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
-    );
-    
-    const result = response.data;
-    console.log('ML service response received');
+    }
     
     // Save to MongoDB with userId
     try {
@@ -169,6 +210,7 @@ app.post('/api/analyze', authenticateToken, async (req, res) => {
         ipAddress: req.ip
       });
       await analysis.save();
+      console.log('Analysis saved to database');
     } catch (dbError) {
       console.error('Database save error:', dbError.message);
     }
@@ -177,11 +219,11 @@ app.post('/api/analyze', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Analyze error:', error.message);
     if (error.response) {
-      console.error('ML service error response:', error.response.data);
+      console.error('Error response:', error.response.data);
     }
     res.status(500).json({ 
       error: 'Failed to analyze text',
-      details: error.response?.data || error.message 
+      details: error.message
     });
   }
 });
