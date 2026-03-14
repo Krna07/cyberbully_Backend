@@ -374,6 +374,30 @@ app.delete('/api/analysis', authenticateToken, async (req, res) => {
   }
 });
 
+// Chatbot proxy endpoint
+const CHATBOT_SERVICE_URL = process.env.CHATBOT_SERVICE_URL || 'http://localhost:8001';
+
+app.post('/api/chat', authenticateToken, async (req, res) => {
+  try {
+    const { message, context } = req.body;
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+    const response = await axios.post(`${CHATBOT_SERVICE_URL}/chat`, 
+      { message, context: context || [] },
+      { timeout: 15000, headers: { 'Content-Type': 'application/json' } }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('Chatbot error:', error.message);
+    // Fallback response if chatbot service is down
+    res.json({
+      response: "I'm here to support you. If you're experiencing cyberbullying, please use our detection tool and consider reporting it to authorities. You're not alone.",
+      model_used: "fallback"
+    });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy',
