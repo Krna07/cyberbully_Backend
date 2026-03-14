@@ -375,7 +375,7 @@ app.delete('/api/analysis', authenticateToken, async (req, res) => {
 });
 
 // Chatbot proxy endpoint
-const CHATBOT_SERVICE_URL = process.env.CHATBOT_SERVICE_URL || 'http://localhost:8001';
+const CHATBOT_SERVICE_URL = process.env.CHATBOT_SERVICE_URL || 'https://cyberbully-chatbot.onrender.com';
 
 app.post('/api/chat', authenticateToken, async (req, res) => {
   try {
